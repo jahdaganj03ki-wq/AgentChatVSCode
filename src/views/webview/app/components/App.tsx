@@ -3,12 +3,15 @@ import { ChatView } from './ChatView';
 import { Sidebar } from './Sidebar';
 import { useChat } from '../context/ChatContext';
 import { ExtensionMessage } from '../types';
+import { getVsCodeApi } from '../vscode-api';
 
 export function App() {
   const { state, dispatch } = useChat();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
   useEffect(() => {
+    getVsCodeApi().postMessage({ type: 'webview-ready' });
+
     const handler = (event: MessageEvent<ExtensionMessage>) => {
       const message = event.data;
       switch (message.type) {

@@ -11,11 +11,16 @@ export class ProviderManager {
   private providers: Map<string, BaseProvider> = new Map();
   private secrets: Secrets;
   private defaultProviderId: string = 'openrouter';
+  private _ready: Promise<void>;
 
   constructor(private context: vscode.ExtensionContext) {
     this.secrets = new Secrets(context.secrets);
     this.initializeDefaults();
-    this.loadConfig();
+    this._ready = this.loadConfig();
+  }
+
+  get ready(): Promise<void> {
+    return this._ready;
   }
 
   private initializeDefaults() {

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
 import hljs from 'highlight.js';
@@ -30,10 +30,38 @@ interface MarkdownRendererProps {
 }
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
-  const html = useMemo(() => {
-    const result = marked.parse(content);
-    return typeof result === 'string' ? result : result;
+  const [html, setHtml] = useState<string>('');
+
+  const syncHtml = useMemo(() => {
+    try {
+      const result = marked.parse(content);
+      if (typeof result === 'string') return result;
+      return null;
+    } catch {
+      return null;
+    }
   }, [content]);
+
+  useEffect(() => {
+    if (syncHtml !== null) {
+      setHtml(syncHtml);
+      return;
+    }
+    try {
+      const result = marked.parse(content);
+      if (result instanceof Promise) {
+        result.then(setHtml).catch(() => {
+          setHtml(`<p>${escapeHtml(content)}</p>`);
+        });
+      }
+    } catch {
+      setHtml(`<p>${escapeHtml(content)}</p>`);
+    }
+  }, [content, syncHtml]);
+
+  if (!html) {
+    return <div className="markdown-content"><p>{content}</p></div>;
+  }
 
   return (
     <div
@@ -41,4 +69,12 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

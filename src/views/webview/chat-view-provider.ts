@@ -18,6 +18,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private settingsPanel: SettingsPanel | undefined;
   private skillManager: SkillManager;
   private skillRegistry: SkillRegistry;
+  private pendingMessages: ExtensionMessage[] = [];
+  private webviewReady = false;
 
   constructor(
     private context: vscode.ExtensionContext,
@@ -46,6 +48,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       `script-src 'nonce-${nonce}'`,
       `img-src data: https: ${webviewView.webview.cspSource}`,
       `font-src ${webviewView.webview.cspSource}`,
+      `connect-src ${webviewView.webview.cspSource}`,
     ].join('; ');
 
     webviewView.webview.html = this.getHtml(webviewView.webview, csp, nonce);
@@ -71,13 +74,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       sessions: this.sessionManager.getAllSessions(),
     });
 
-    this.postMessage({
-      type: 'settings',
-      settings: {
-        providers: this.providerManager.getProviderConfigs(),
-        defaultProvider: this.providerManager.getDefault().providerId,
-        systemPrompt: vscode.workspace.getConfiguration('apexagent').get<string>('systemPrompt', 'You are a helpful AI assistant.'),
-      },
+    this.providerManager.ready.then(() => {
+      this.postMessage({
+        type: 'settings',
+        settings: {
+          providers: this.providerManager.getProviderConfigs(),
+          defaultProvider: this.providerManager.getDefault().providerId,
+          systemPrompt: vscode.workspace.getConfiguration('apexagent').get<string>('systemPrompt', 'You are a helpful AI assistant.'),
+        },
+      });
     });
 
     // Initialize skills
@@ -123,11 +128,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   postMessage(message: ExtensionMessage) {
+    if (!this.webviewReady) {
+      this.pendingMessages.push(message);
+      return;
+    }
     this.view?.webview.postMessage(message);
+  }
+
+  private flushPendingMessages() {
+    for (const msg of this.pendingMessages) {
+      this.view?.webview.postMessage(msg);
+    }
+    this.pendingMessages = [];
   }
 
   private async handleMessage(message: WebviewMessage) {
     switch (message.type) {
+      case 'webview-ready': {
+        this.webviewReady = true;
+        this.flushPendingMessages();
+        break;
+      }
+
       case 'set-provider': {
         if (message.providerId) {
           this.providerManager.setDefault(message.providerId);
@@ -384,7 +406,7 @@ interface ExtensionMessage {
 }
 
 interface WebviewMessage {
-  type: 'send-message' | 'cancel-stream' | 'regenerate' | 'new-chat' | 'load-session' | 'save-settings' | 'test-connection' | 'pick-attachment' | 'set-provider' | 'list-skills' | 'install-skill' | 'uninstall-skill' | 'activate-skill' | 'deactivate-skill' | 'search-skills';
+  type: 'send-message' | 'cancel-stream' | 'regenerate' | 'new-chat' | 'load-session' | 'save-settings' | 'test-connection' | 'pick-attachment' | 'set-provider' | 'list-skills' | 'install-skill' | 'uninstall-skill' | 'activate-skill' | 'deactivate-skill' | 'search-skills' | 'webview-ready';
   text?: string;
   providerId?: string;
   sessionId?: string;
