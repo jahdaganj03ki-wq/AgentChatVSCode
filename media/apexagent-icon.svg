@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#bg)"/>
+  <!-- Robot head -->
+  <rect x="30" y="36" width="68" height="54" rx="12" fill="white" opacity="0.95"/>
+  <!-- Antenna -->
+  <line x1="64" y1="20" x2="64" y2="36" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="64" cy="17" r="5" fill="white"/>
+  <!-- Eyes -->
+  <circle cx="50" cy="58" r="6" fill="#6366f1"/>
+  <circle cx="78" cy="58" r="6" fill="#6366f1"/>
+  <!-- Eye glow -->
+  <circle cx="50" cy="58" r="2.5" fill="white"/>
+  <circle cx="78" cy="58" r="2.5" fill="white"/>
+  <!-- Smile / chat line -->
+  <rect x="42" y="73" width="44" height="6" rx="3" fill="#6366f1"/>
+  <!-- Ears -->
+  <rect x="24" y="50" width="6" height="14" rx="3" fill="white" opacity="0.9"/>
+  <rect x="98" y="50" width="6" height="14" rx="3" fill="white" opacity="0.9"/>
+  <!-- Small chat dots -->
+  <circle cx="56" cy="73" r="2" fill="white" opacity="0.5"/>
+  <circle cx="64" cy="73" r="2" fill="white" opacity="0.5"/>
+  <circle cx="72" cy="73" r="2" fill="white" opacity="0.5"/>
+</svg>

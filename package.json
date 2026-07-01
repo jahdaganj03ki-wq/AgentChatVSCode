@@ -1,0 +1,171 @@
+{
+  "name": "apexagent-vscode",
+  "displayName": "ApexAgent",
+  "description": "Multi-Provider Chat Panel with a focus on free models",
+  "version": "0.1.0",
+  "icon": "media/icon.png",
+  "publisher": "apexagent",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Chat",
+    "Other"
+  ],
+  "activationEvents": [
+    "onChat:apexagent.openChat",
+    "onCommand:apexagent.openChat",
+    "onCommand:apexagent.newChat",
+    "onCommand:apexagent.askSelection",
+    "onCommand:apexagent.regenerate",
+    "onCommand:apexagent.cancel",
+    "onCommand:apexagent.openSettings"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "apexagent.openChat",
+        "title": "ApexAgent: Open Chat"
+      },
+      {
+        "command": "apexagent.newChat",
+        "title": "ApexAgent: New Chat"
+      },
+      {
+        "command": "apexagent.askSelection",
+        "title": "ApexAgent: Ask about Selection"
+      },
+      {
+        "command": "apexagent.regenerate",
+        "title": "ApexAgent: Regenerate Last Response"
+      },
+      {
+        "command": "apexagent.cancel",
+        "title": "ApexAgent: Cancel Streaming"
+      },
+      {
+        "command": "apexagent.openSettings",
+        "title": "ApexAgent: Open Settings"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "apexagent.openChat",
+        "key": "ctrl+shift+i"
+      },
+      {
+        "command": "apexagent.newChat",
+        "key": "ctrl+shift+n"
+      },
+      {
+        "command": "apexagent.askSelection",
+        "key": "ctrl+shift+k"
+      },
+      {
+        "command": "apexagent.regenerate",
+        "key": "ctrl+shift+r"
+      },
+      {
+        "command": "apexagent.cancel",
+        "key": "escape",
+        "when": "apexagent.streaming"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "apexagent.askSelection",
+          "group": "apexagent"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "apexagent.askSelection",
+          "group": "apexagent"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "apexagent",
+          "title": "ApexAgent",
+          "icon": "media/apexagent.svg"
+        }
+      ]
+    },
+    "views": {
+      "apexagent": [
+        {
+          "type": "tree",
+          "id": "apexagent-sessions",
+          "name": "Sessions"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "ApexAgent",
+      "properties": {
+        "apexagent.logLevel": {
+          "type": "string",
+          "default": "info",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error",
+            "none"
+          ],
+          "description": "Log level for ApexAgent output channel"
+        },
+        "apexagent.defaultProvider": {
+          "type": "string",
+          "default": "openrouter",
+          "description": "Default provider ID"
+        },
+        "apexagent.systemPrompt": {
+          "type": "string",
+          "default": "You are a helpful AI assistant.",
+          "description": "Default system prompt"
+        },
+        "apexagent.sessionLimit": {
+          "type": "number",
+          "default": 100,
+          "description": "Maximum number of stored sessions"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.config.js",
+    "build:dev": "node esbuild.config.js --dev",
+    "watch": "node esbuild.config.js --watch",
+    "lint": "eslint src --ext .ts,.tsx",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vscode-test",
+    "package": "vsce package",
+    "vscode:prepublish": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/vscode": "^1.95.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.24.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "highlight.js": "^11.10.0",
+    "marked": "^14.0.0",
+    "marked-highlight": "^2.2.4",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  }
+}
