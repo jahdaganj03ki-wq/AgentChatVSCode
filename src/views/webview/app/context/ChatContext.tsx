@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useCallback, useRef } from 'react';
-import { ChatMessage, Session, AppSettings, Attachment } from '../types';
+import { ChatMessage, Session, AppSettings, Attachment, SkillInfo } from '../types';
 import { postMessage } from '../vscode-api';
 
 interface ChatState {
@@ -9,6 +9,8 @@ interface ChatState {
   isStreaming: boolean;
   streamingContent: string;
   settings: AppSettings | null;
+  skills: SkillInfo[];
+  skillInstallProgress: { name: string; status: 'downloading' | 'installing' | 'error'; message?: string } | null;
 }
 
 type ChatAction =
@@ -19,7 +21,9 @@ type ChatAction =
   | { type: 'APPEND_STREAM_CHUNK'; content: string }
   | { type: 'STREAM_DONE' }
   | { type: 'SET_SETTINGS'; settings: AppSettings }
-  | { type: 'SET_CURRENT_SESSION'; sessionId: string | null };
+  | { type: 'SET_CURRENT_SESSION'; sessionId: string | null }
+  | { type: 'SET_SKILLS'; skills: SkillInfo[] }
+  | { type: 'SET_SKILL_INSTALL_PROGRESS'; progress: { name: string; status: 'downloading' | 'installing' | 'error'; message?: string } | null };
 
 function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
@@ -47,6 +51,10 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return { ...state, settings: action.settings };
     case 'SET_CURRENT_SESSION':
       return { ...state, currentSessionId: action.sessionId };
+    case 'SET_SKILLS':
+      return { ...state, skills: action.skills };
+    case 'SET_SKILL_INSTALL_PROGRESS':
+      return { ...state, skillInstallProgress: action.progress };
     default:
       return state;
   }
@@ -59,6 +67,8 @@ const initialState: ChatState = {
   isStreaming: false,
   streamingContent: '',
   settings: null,
+  skills: [],
+  skillInstallProgress: null,
 };
 
 interface ChatContextValue {
@@ -69,6 +79,11 @@ interface ChatContextValue {
   regenerate: () => void;
   newChat: () => void;
   loadSession: (sessionId: string) => void;
+  installSkill: (source: string, name: string, scope?: 'project' | 'global') => void;
+  uninstallSkill: (name: string) => void;
+  activateSkill: (names: string[]) => void;
+  deactivateSkill: (names: string[]) => void;
+  searchSkills: (query: string) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -111,8 +126,28 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     postMessage({ type: 'load-session', sessionId });
   }, []);
 
+  const installSkill = useCallback((source: string, name: string, scope?: 'project' | 'global') => {
+    postMessage({ type: 'install-skill', source, name, scope });
+  }, []);
+
+  const uninstallSkill = useCallback((name: string) => {
+    postMessage({ type: 'uninstall-skill', name });
+  }, []);
+
+  const activateSkill = useCallback((names: string[]) => {
+    postMessage({ type: 'activate-skill', names });
+  }, []);
+
+  const deactivateSkill = useCallback((names: string[]) => {
+    postMessage({ type: 'deactivate-skill', names });
+  }, []);
+
+  const searchSkills = useCallback((query: string) => {
+    postMessage({ type: 'search-skills', query });
+  }, []);
+
   return (
-    <ChatContext.Provider value={{ state, dispatch, sendMessage, cancelStream, regenerate, newChat, loadSession }}>
+    <ChatContext.Provider value={{ state, dispatch, sendMessage, cancelStream, regenerate, newChat, loadSession, installSkill, uninstallSkill, activateSkill, deactivateSkill, searchSkills }}>
       {children}
     </ChatContext.Provider>
   );

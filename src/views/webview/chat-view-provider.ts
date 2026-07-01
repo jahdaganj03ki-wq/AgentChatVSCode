@@ -6,61 +6,59 @@ import { SettingsPanel } from './settings-panel';
 import { Logger } from '../../utils/logger';
 import { Attachment } from '../../utils/storage';
 import { getMimeType } from '../../utils/mime';
+import { SkillManager } from '../../skills/skill-manager';
+import { SkillRegistry } from '../../skills/skill-registry';
+import { SkillInfo } from '../../skills/types';
 
-export class ChatPanel {
-  public static current: ChatPanel | undefined;
-  private panel: vscode.WebviewPanel | undefined;
+export class ChatViewProvider implements vscode.WebviewViewProvider {
+  public static current: ChatViewProvider | undefined;
+  private view: vscode.WebviewView | undefined;
   private chatManager: ChatManager;
   private sessionManager: SessionManager;
+  private settingsPanel: SettingsPanel | undefined;
+  private skillManager: SkillManager;
+  private skillRegistry: SkillRegistry;
 
   constructor(
     private context: vscode.ExtensionContext,
     private providerManager: ProviderManager
   ) {
     this.sessionManager = new SessionManager(context);
+    this.skillManager = new SkillManager(context);
+    this.skillRegistry = new SkillRegistry();
     const defaultProvider = providerManager.getDefault();
     this.chatManager = new ChatManager(this.sessionManager, defaultProvider);
-    ChatPanel.current = this;
+    this.chatManager.setSkillManager(this.skillManager);
+    ChatViewProvider.current = this;
   }
 
-  show() {
-    if (this.panel) {
-      this.panel.reveal(vscode.ViewColumn.Beside);
-      return;
-    }
+  resolveWebviewView(
+    webviewView: vscode.WebviewView,
+    _context: vscode.WebviewViewResolveContext,
+    _token: vscode.CancellationToken
+  ) {
+    this.view = webviewView;
 
-    this.panel = vscode.window.createWebviewPanel(
-      'apexagent.chat',
-      'ApexAgent Chat',
-      vscode.ViewColumn.Beside,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'dist')],
-      }
-    );
-
-    this.panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'icon.png');
-
+    const nonce = this.getNonce();
     const csp = [
       `default-src 'none'`,
-      `style-src 'unsafe-inline' ${this.panel.webview.cspSource}`,
-      `script-src 'nonce-${this.getNonce()}'`,
-      `img-src data: https: ${this.panel.webview.cspSource}`,
-      `font-src ${this.panel.webview.cspSource}`,
+      `style-src 'unsafe-inline' ${webviewView.webview.cspSource}`,
+      `script-src 'nonce-${nonce}'`,
+      `img-src data: https: ${webviewView.webview.cspSource}`,
+      `font-src ${webviewView.webview.cspSource}`,
     ].join('; ');
 
-    this.panel.webview.html = this.getHtml(csp);
+    webviewView.webview.html = this.getHtml(webviewView.webview, csp, nonce);
 
-    this.panel.webview.onDidReceiveMessage(
+    webviewView.webview.onDidReceiveMessage(
       (message) => this.handleMessage(message),
       undefined,
-      (context as any).subscriptions
+      (this.context as any).subscriptions
     );
 
-    this.panel.onDidDispose(() => {
-      this.panel = undefined;
-      ChatPanel.current = undefined;
+    webviewView.onDidDispose(() => {
+      this.view = undefined;
+      ChatViewProvider.current = undefined;
     });
 
     this.sessionManager.createSession(
@@ -82,7 +80,15 @@ export class ChatPanel {
       },
     });
 
-    Logger.info('ChatPanel', 'Webview panel created');
+    // Initialize skills
+    this.skillManager.initialize().then(() => {
+      this.postMessage({
+        type: 'skill-list',
+        skills: this.skillManager.getAll(),
+      });
+    });
+
+    Logger.info('ChatViewProvider', 'Webview view resolved');
   }
 
   private getNonce(): string {
@@ -92,9 +98,12 @@ export class ChatPanel {
     return text;
   }
 
-  private getHtml(csp: string): string {
-    const scriptUri = this.panel!.webview.asWebviewUri(
+  private getHtml(webview: vscode.Webview, csp: string, nonce: string): string {
+    const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'index.js')
+    );
+    const styleUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'index.css')
     );
 
     return `<!DOCTYPE html>
@@ -103,21 +112,29 @@ export class ChatPanel {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="${csp}">
+  <link rel="stylesheet" href="${styleUri}">
   <title>ApexAgent</title>
 </head>
 <body>
   <div id="root"></div>
-  <script nonce="${this.getNonce()}" src="${scriptUri}"></script>
+  <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
   }
 
-  private postMessage(message: ExtensionMessage) {
-    this.panel?.webview.postMessage(message);
+  postMessage(message: ExtensionMessage) {
+    this.view?.webview.postMessage(message);
   }
 
   private async handleMessage(message: WebviewMessage) {
     switch (message.type) {
+      case 'set-provider': {
+        if (message.providerId) {
+          this.providerManager.setDefault(message.providerId);
+        }
+        break;
+      }
+
       case 'pick-attachment': {
         const uris = await vscode.window.showOpenDialog({
           canSelectMany: true,
@@ -235,6 +252,71 @@ export class ChatPanel {
         this.postMessage({ type: 'test-result', result });
         break;
       }
+
+      case 'list-skills': {
+        this.postMessage({ type: 'skill-list', skills: this.skillManager.getAll() });
+        break;
+      }
+
+      case 'install-skill': {
+        const name = message.name!;
+        const source = message.source!;
+        const scope = message.scope || 'project';
+        try {
+          this.postMessage({ type: 'skill-install-progress', name, status: 'downloading' });
+          await this.skillManager.install(source, scope);
+          this.postMessage({ type: 'skill-installed', skill: { name } as any });
+          this.postMessage({ type: 'skill-list', skills: this.skillManager.getAll() });
+        } catch (err: any) {
+          this.postMessage({ type: 'skill-install-progress', name, status: 'error', message: err.message });
+        }
+        break;
+      }
+
+      case 'uninstall-skill': {
+        try {
+          await this.skillManager.uninstall(message.name!);
+          this.postMessage({ type: 'skill-list', skills: this.skillManager.getAll() });
+        } catch (err: any) {
+          Logger.error('ChatViewProvider', `Uninstall failed: ${err.message}`);
+        }
+        break;
+      }
+
+      case 'activate-skill': {
+        try {
+          for (const name of message.names!) {
+            await this.skillManager.activate(name);
+          }
+          this.postMessage({ type: 'skill-activated', names: message.names! });
+          this.postMessage({ type: 'skill-list', skills: this.skillManager.getAll() });
+        } catch (err: any) {
+          Logger.error('ChatViewProvider', `Activate failed: ${err.message}`);
+        }
+        break;
+      }
+
+      case 'deactivate-skill': {
+        try {
+          for (const name of message.names!) {
+            await this.skillManager.deactivate(name);
+          }
+          this.postMessage({ type: 'skill-list', skills: this.skillManager.getAll() });
+        } catch (err: any) {
+          Logger.error('ChatViewProvider', `Deactivate failed: ${err.message}`);
+        }
+        break;
+      }
+
+      case 'search-skills': {
+        try {
+          const results = await this.skillRegistry.searchAll(message.query || '');
+          this.postMessage({ type: 'skill-search-results', skills: results });
+        } catch (err: any) {
+          Logger.error('ChatViewProvider', `Search failed: ${err.message}`);
+        }
+        break;
+      }
     }
   }
 
@@ -269,8 +351,6 @@ export class ChatPanel {
     this.chatManager.cancelStream();
   }
 
-  private settingsPanel: SettingsPanel | undefined;
-
   openSettings() {
     if (!this.settingsPanel) {
       this.settingsPanel = new SettingsPanel(this.context, this.providerManager);
@@ -279,12 +359,12 @@ export class ChatPanel {
   }
 
   dispose() {
-    this.panel?.dispose();
+    this.view?.dispose();
   }
 }
 
 interface ExtensionMessage {
-  type: 'stream-chunk' | 'stream-done' | 'stream-error' | 'model-list' | 'session-list' | 'settings' | 'messages-load' | 'test-result' | 'send-text' | 'attachments-picked';
+  type: 'stream-chunk' | 'stream-done' | 'stream-error' | 'model-list' | 'session-list' | 'settings' | 'messages-load' | 'test-result' | 'send-text' | 'attachments-picked' | 'skill-list' | 'skill-installed' | 'skill-activated' | 'skill-install-progress' | 'skill-search-results';
   content?: string;
   error?: string;
   sessions?: any[];
@@ -293,13 +373,23 @@ interface ExtensionMessage {
   result?: any;
   text?: string;
   attachments?: Attachment[];
+  skills?: any[];
+  skill?: any;
+  name?: string;
+  status?: string;
+  names?: string[];
 }
 
 interface WebviewMessage {
-  type: 'send-message' | 'cancel-stream' | 'regenerate' | 'new-chat' | 'load-session' | 'save-settings' | 'test-connection' | 'pick-attachment';
+  type: 'send-message' | 'cancel-stream' | 'regenerate' | 'new-chat' | 'load-session' | 'save-settings' | 'test-connection' | 'pick-attachment' | 'set-provider' | 'list-skills' | 'install-skill' | 'uninstall-skill' | 'activate-skill' | 'deactivate-skill' | 'search-skills';
   text?: string;
   providerId?: string;
   sessionId?: string;
   apiKey?: string;
   systemPrompt?: string;
+  name?: string;
+  source?: string;
+  scope?: 'project' | 'global';
+  names?: string[];
+  query?: string;
 }

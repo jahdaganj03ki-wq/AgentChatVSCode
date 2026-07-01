@@ -63,6 +63,18 @@ export function App() {
             });
           }
           break;
+        case 'skill-list':
+          dispatch({ type: 'SET_SKILLS', skills: message.skills || [] });
+          break;
+        case 'skill-installed':
+          // Skills will be refreshed via skill-list
+          break;
+        case 'skill-install-progress':
+          dispatch({
+            type: 'SET_SKILL_INSTALL_PROGRESS',
+            progress: { name: message.name || '', status: message.status as any, message: message.error },
+          });
+          break;
       }
     };
 

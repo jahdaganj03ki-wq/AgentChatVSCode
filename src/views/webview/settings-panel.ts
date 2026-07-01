@@ -28,13 +28,14 @@ export class SettingsPanel {
       }
     );
 
+    const nonce = this.getNonce();
     const csp = [
       `default-src 'none'`,
       `style-src 'unsafe-inline' ${this.panel.webview.cspSource}`,
-      `script-src 'nonce-${this.getNonce()}'`,
+      `script-src 'nonce-${nonce}'`,
     ].join('; ');
 
-    this.panel.webview.html = this.getHtml(csp);
+    this.panel.webview.html = this.getHtml(csp, nonce);
 
     this.panel.webview.onDidReceiveMessage(
       (message) => this.handleMessage(message),
@@ -66,9 +67,12 @@ export class SettingsPanel {
     return text;
   }
 
-  private getHtml(csp: string): string {
+  private getHtml(csp: string, nonce: string): string {
     const scriptUri = this.panel!.webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'settings.js')
+    );
+    const styleUri = this.panel!.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'settings.css')
     );
 
     return `<!DOCTYPE html>
@@ -77,11 +81,12 @@ export class SettingsPanel {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="${csp}">
+  <link rel="stylesheet" href="${styleUri}">
   <title>ApexAgent Settings</title>
 </head>
 <body>
   <div id="settings-root"></div>
-  <script nonce="${this.getNonce()}" src="${scriptUri}"></script>
+  <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
   }

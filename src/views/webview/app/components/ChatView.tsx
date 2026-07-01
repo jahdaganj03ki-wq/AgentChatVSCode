@@ -2,6 +2,7 @@ import React from 'react';
 import { MessageList } from './MessageList';
 import { InputArea } from './InputArea';
 import { useChat } from '../context/ChatContext';
+import { SkillSelector } from './SkillSelector';
 import { postMessage } from '../vscode-api';
 
 interface ChatViewProps {
@@ -17,7 +18,8 @@ export function ChatView({ onOpenSidebar }: ChatViewProps) {
         <button className="header-btn" onClick={onOpenSidebar} title="Sessions">
           &#8592; Sessions
         </button>
-        <select className="header-select" value={state.settings?.defaultProvider || ''}>
+        <SkillSelector />
+        <select className="header-select" value={state.settings?.defaultProvider || ''} onChange={(e) => postMessage({ type: 'set-provider', providerId: e.target.value })}>
           {state.settings?.providers
             .filter((p) => p.enabled)
             .map((p) => (

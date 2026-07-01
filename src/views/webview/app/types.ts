@@ -38,8 +38,17 @@ export interface ProviderConfig {
   enabled: boolean;
 }
 
+export interface SkillInfo {
+  name: string;
+  description: string;
+  tags: string[];
+  state: 'discovered' | 'installed' | 'active' | 'error';
+  source?: string;
+  format?: string;
+}
+
 export interface ExtensionMessage {
-  type: 'stream-chunk' | 'stream-done' | 'stream-error' | 'model-list' | 'session-list' | 'settings' | 'messages-load' | 'test-result' | 'send-text' | 'attachments-picked';
+  type: 'stream-chunk' | 'stream-done' | 'stream-error' | 'model-list' | 'session-list' | 'settings' | 'messages-load' | 'test-result' | 'send-text' | 'attachments-picked' | 'skill-list' | 'skill-installed' | 'skill-activated' | 'skill-install-progress' | 'skill-search-results';
   content?: string;
   error?: string;
   sessions?: Session[];
@@ -48,6 +57,11 @@ export interface ExtensionMessage {
   result?: TestResult;
   text?: string;
   attachments?: Attachment[];
+  skills?: SkillInfo[];
+  skill?: SkillInfo;
+  names?: string[];
+  name?: string;
+  status?: string;
 }
 
 export interface AppSettings {
@@ -70,4 +84,11 @@ export type WebviewMessage =
   | { type: 'load-session'; sessionId: string }
   | { type: 'pick-attachment' }
   | { type: 'save-settings'; providerId: string; apiKey?: string }
-  | { type: 'test-connection'; providerId: string };
+  | { type: 'test-connection'; providerId: string }
+  | { type: 'set-provider'; providerId: string }
+  | { type: 'list-skills' }
+  | { type: 'install-skill'; source: string; scope?: 'project' | 'global'; name: string }
+  | { type: 'uninstall-skill'; name: string }
+  | { type: 'activate-skill'; names: string[] }
+  | { type: 'deactivate-skill'; names: string[] }
+  | { type: 'search-skills'; query: string };

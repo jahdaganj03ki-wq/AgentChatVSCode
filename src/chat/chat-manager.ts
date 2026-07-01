@@ -1,9 +1,12 @@
+import * as vscode from 'vscode';
 import { BaseProvider, ChatMessage, ContentPart } from '../providers/base-provider';
 import { SessionManager } from './session-manager';
 import { createStreamController } from './streaming';
 import { withRetry } from './retry';
 import { Logger } from '../utils/logger';
 import { Attachment } from '../utils/storage';
+import { SkillManager } from '../skills/skill-manager';
+import { SkillResolver } from '../skills/skill-resolver';
 
 export type StreamCallback = {
   onChunk: (content: string) => void;
@@ -13,6 +16,9 @@ export type StreamCallback = {
 
 export class ChatManager {
   private streamController: ReturnType<typeof createStreamController> | null = null;
+  private skillManager: SkillManager | null = null;
+  private skillResolver = new SkillResolver();
+  private defaultSystemPrompt = 'You are a helpful AI assistant.';
 
   constructor(
     private sessionManager: SessionManager,
@@ -23,11 +29,52 @@ export class ChatManager {
     this.provider = provider;
   }
 
+  setSkillManager(sm: SkillManager) {
+    this.skillManager = sm;
+  }
+
+  private buildSystemPromptWithSkills(basePrompt: string): string {
+    if (!this.skillManager) return basePrompt;
+    const activeSkills = this.skillManager.getActiveSkills();
+    if (activeSkills.length === 0) return basePrompt;
+
+    const skillBlocks = activeSkills.map((s) =>
+      `--- BEGIN SKILL: ${s.name} ---\n${s.content}\n--- END SKILL: ${s.name} ---`
+    ).join('\n\n');
+
+    return `${skillBlocks}\n\n${basePrompt}`;
+  }
+
   async sendMessage(userContent: string, callbacks: StreamCallback, attachments?: Attachment[]): Promise<void> {
     this.streamController = createStreamController();
 
     const session = this.sessionManager.getCurrent();
     if (!session) throw new Error('No active session');
+
+    // Pre-processing: resolve matching skills
+    if (this.skillManager) {
+      const config = vscode.workspace.getConfiguration('apexagent');
+      const enabled = config.get<boolean>('skills.enabled', true);
+      const autoActivate = config.get<boolean>('skills.autoActivate', true);
+
+      if (enabled && autoActivate) {
+        const allSkills = this.skillManager.getAll();
+        const installedSkills = allSkills
+          .filter((s) => s.state === 'installed' || s.state === 'active')
+          .map((s) => this.skillManager!.get(s.name)!)
+          .filter(Boolean);
+
+        const result = this.skillResolver.resolve(userContent, installedSkills);
+        if (result.skills.length > 0) {
+          Logger.info('ChatManager', `Auto-activating ${result.skills.length} skill(s) for prompt (confidence: ${result.confidence.toFixed(2)})`);
+          for (const skill of result.skills) {
+            if (!this.skillManager.getActiveSkills().some((s) => s.name === skill.name)) {
+              await this.skillManager.activate(skill.name);
+            }
+          }
+        }
+      }
+    }
 
     this.sessionManager.addMessage('user', userContent, attachments);
 
@@ -49,6 +96,17 @@ export class ChatManager {
         }
         messages.push({ role: msg.role, content });
       }
+    }
+
+    // Inject system prompt with skills
+    const systemPromptIndex = messages.findIndex((m) => m.role === 'system');
+    const basePrompt = session.systemPrompt || this.defaultSystemPrompt;
+    const promptWithSkills = this.buildSystemPromptWithSkills(basePrompt);
+
+    if (systemPromptIndex >= 0) {
+      messages[systemPromptIndex] = { role: 'system', content: promptWithSkills };
+    } else {
+      messages.unshift({ role: 'system', content: promptWithSkills });
     }
 
     let fullContent = '';
