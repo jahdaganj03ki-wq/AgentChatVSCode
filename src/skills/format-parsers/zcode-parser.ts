@@ -6,7 +6,7 @@ export function parseZCodeSkill(
   directory: string,
   source: SkillSource
 ): Skill | null {
-  const parsed = parseSkillMd(raw);
+  const parsed = parseSkillMd(raw, directory, 'zcode', source);
   if (!parsed) return null;
   return {
     ...parsed,

@@ -18,7 +18,7 @@ export function parseClaudeSkill(
   directory: string,
   source: SkillSource
 ): Skill | null {
-  const parsed = parseSkillMd(raw);
+  const parsed = parseSkillMd(raw, directory, 'claude', source);
   if (!parsed) return null;
   return {
     ...parsed,

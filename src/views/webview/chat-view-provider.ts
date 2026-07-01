@@ -359,7 +359,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   dispose() {
-    this.view?.dispose();
+    if (this.view) {
+      (this.view as any).dispose();
+    }
   }
 }
 
@@ -377,6 +379,7 @@ interface ExtensionMessage {
   skill?: any;
   name?: string;
   status?: string;
+  message?: string;
   names?: string[];
 }
 

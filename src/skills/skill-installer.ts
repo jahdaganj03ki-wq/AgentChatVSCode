@@ -21,17 +21,17 @@ export class SkillInstaller {
         switch (method) {
           case 'npx':
             if (resolved.type === 'npx') {
-              return await this.installViaNpx(resolved.package, scope);
+              return await this.installViaNpx(resolved.package!, scope);
             }
             break;
           case 'git':
             if (resolved.type === 'git' || resolved.type === 'local') {
-              return await this.installViaGit(resolved.url || resolved.path, scope);
+              return await this.installViaGit(resolved.url || resolved.path!, scope);
             }
             break;
           case 'http':
             if (resolved.type === 'url') {
-              return await this.installViaHttp(resolved.url, scope);
+              return await this.installViaHttp(resolved.url!, scope);
             }
             break;
         }

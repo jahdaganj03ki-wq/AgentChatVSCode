@@ -6,7 +6,7 @@ export function parseCodexSkill(
   directory: string,
   source: SkillSource
 ): Skill | null {
-  const parsed = parseSkillMd(raw);
+  const parsed = parseSkillMd(raw, directory, 'codex', source);
   if (!parsed) return null;
   return {
     ...parsed,
