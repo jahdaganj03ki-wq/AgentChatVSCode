@@ -41,7 +41,7 @@ export class SkillResolver {
       const descTokens = this.tokenize(skill.description);
 
       let matchCount = 0;
-      let totalWeight = keywords.length * 3; // 3x weight for name matching by default
+      const totalWeight = keywords.length * 3; // 3x weight for name matching by default
 
       for (const kw of keywords) {
         const nameScore = nameTokens.filter((t) => t.includes(kw) || kw.includes(t)).length * 3;

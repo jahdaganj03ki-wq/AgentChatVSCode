@@ -57,9 +57,7 @@ export function parseFrontmatter(raw: string): ParsedSkill | null {
 function parseYaml(str: string): Record<string, any> {
   const result: Record<string, any> = {};
   let currentKey = '';
-  let currentValue: any = '';
   let inMeta = false;
-  let metaKey = '';
 
   for (const line of str.split('\n')) {
     if (line.startsWith('metadata:')) {
