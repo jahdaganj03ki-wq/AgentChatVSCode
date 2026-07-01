@@ -91,4 +91,5 @@ export type WebviewMessage =
   | { type: 'uninstall-skill'; name: string }
   | { type: 'activate-skill'; names: string[] }
   | { type: 'deactivate-skill'; names: string[] }
-  | { type: 'search-skills'; query: string };
+  | { type: 'search-skills'; query: string }
+  | { type: 'webview-ready' };
